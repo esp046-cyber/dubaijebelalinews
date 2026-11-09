@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Export ZIP | Daily Dubai News</title>
+<meta name="robots" content="noindex">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 20px; background: #06122A; color: #fff; font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Arial, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; display: grid; gap: 14px; }
+  h1 { color: #F2C94C; margin: 0; font-size: 1.4rem; }
+  p { margin: 0; color: #C8D3E6; }
+  code { color: #F2C94C; }
+  button { min-height: 52px; padding: 0 22px; border-radius: 12px; border: 2px solid #F2C94C; background: #F2C94C; color: #0B1F3A; font: inherit; font-weight: 800; cursor: pointer; justify-self: start; }
+  button:disabled { opacity: .6; cursor: progress; }
+  pre { margin: 0; background: #0E1B30; border: 1px solid #1E2F4D; border-radius: 12px; padding: 12px; min-height: 160px; max-height: 50vh; overflow: auto; font-size: .82rem; white-space: pre-wrap; }
+  .warn { background: #3A2B00; border: 1px solid #F2C94C; border-radius: 12px; padding: 10px 14px; color: #FFE9A8; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Build dubaijebelalinews.zip</h1>
+  <p>One click compiles the whole project (HTML, CSS, JS, manifest, service worker) and generates every PNG, the OG image, screenshots and <code>favicon.ico</code> with Canvas, then downloads a single ZIP.</p>
+  <p id="warn" class="warn" hidden>This page was opened from <code>file://</code>, where browsers block reading the project files. Serve the folder instead (for example <code>python3 -m http.server</code> in the project root, then open <code>http://localhost:8000/tools/export-zip.html</code>) or open this page from your deployed site.</p>
+  <button type="button" id="go">Compile &amp; download ZIP</button>
+  <pre id="log" aria-live="polite">Ready.</pre>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="./asset-lib.js"></script>
+<script>
+(function () {
+  'use strict';
+  var TEXT_FILES = [
+    'index.html', 'manifest.webmanifest', 'sw.js', 'offline.html', 'favicon.svg', 'README.md',
+    'css/styles.css', 'js/app.js',
+    'tools/asset-lib.js', 'tools/generate-assets.html', 'tools/export-zip.html'
+  ];
+  var log = document.getElementById('log'), go = document.getElementById('go');
+  if (location.protocol === 'file:') document.getElementById('warn').hidden = false;
+  function say(t) { log.textContent += '\n' + t; log.scrollTop = log.scrollHeight; }
+
+  go.addEventListener('click', async function () {
+    go.disabled = true; log.textContent = 'Starting…';
+    try {
+      if (typeof JSZip === 'undefined') throw new Error('JSZip did not load. Check your connection (cdnjs.cloudflare.com) and retry.');
+      var zip = new JSZip(), root = zip.folder('dubaijebelalinews'), skipped = [];
+
+      for (var i = 0; i < TEXT_FILES.length; i++) {
+        var f = TEXT_FILES[i];
+        try {
+          var r = await fetch('../' + f, { cache: 'no-store' });
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          root.file(f, await r.text());
+          say('✓ ' + f);
+        } catch (e) { skipped.push(f); say('✗ ' + f + ' (' + e.message + ')'); }
+      }
+      root.file('.nojekyll', '');
+
+      for (var j = 0; j < AssetLib.ASSETS.length; j++) {
+        var a = AssetLib.ASSETS[j];
+        root.file(a.path, await AssetLib.toBlob(a.make()));
+        say('✓ ' + a.path + ' (generated)');
+      }
+      root.file('favicon.ico', await AssetLib.icoBlob());
+      say('✓ favicon.ico (generated)');
+
+      say('Compressing…');
+      var blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 9 } });
+      var a2 = document.createElement('a');
+      a2.href = URL.createObjectURL(blob); a2.download = 'dubaijebelalinews.zip';
+      document.body.appendChild(a2); a2.click(); a2.remove();
+      setTimeout(function () { URL.revokeObjectURL(a2.href); }, 5000);
+      say(skipped.length
+        ? 'Done, but ' + skipped.length + ' file(s) could not be read: ' + skipped.join(', ') + '. Serve this folder over http and retry.'
+        : 'Done. dubaijebelalinews.zip downloaded (' + Math.round(blob.size / 1024) + ' KB).');
+    } catch (e) {
+      say('Error: ' + e.message);
+    } finally { go.disabled = false; }
+  });
+})();
+</script>
+</body>
+</html>

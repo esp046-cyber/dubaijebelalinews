@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Generate assets | Daily Dubai News</title>
+<meta name="robots" content="noindex">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 20px; background: #06122A; color: #fff; font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Arial, sans-serif; }
+  h1 { color: #F2C94C; margin: 0 0 6px; font-size: 1.4rem; }
+  p { color: #C8D3E6; max-width: 70ch; }
+  .bar { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 22px; }
+  button { min-height: 44px; padding: 0 18px; border-radius: 10px; border: 2px solid #F2C94C; background: #F2C94C; color: #0B1F3A; font: inherit; font-weight: 700; cursor: pointer; }
+  button.alt { background: transparent; color: #F2C94C; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+  .item { background: #0E1B30; border: 1px solid #1E2F4D; border-radius: 14px; padding: 12px; display: grid; gap: 8px; align-content: start; }
+  .item canvas { max-width: 100%; height: auto; background: repeating-conic-gradient(#14233C 0 25%, #0E1B30 0 50%) 0 0 / 16px 16px; border-radius: 8px; justify-self: start; }
+  .item code { font-size: .8rem; color: #F2C94C; word-break: break-all; }
+  .item small { color: #9FB0CC; }
+</style>
+</head>
+<body>
+<h1>Asset generator</h1>
+<p>Draws every PNG and the favicon.ico with HTML5 Canvas (golden-and-navy skyline). Download files one by one, or use the exporter to get everything in a single ZIP.</p>
+<div class="bar">
+  <button type="button" id="all">Download all PNGs</button>
+  <button type="button" class="alt" id="ico">Download favicon.ico</button>
+  <button type="button" class="alt" id="zip">Open ZIP exporter</button>
+</div>
+<p id="note">Your browser may ask permission to download multiple files. Allow it, then save each file to the matching folder shown under its preview.</p>
+<div class="grid" id="grid"></div>
+
+<script src="./asset-lib.js"></script>
+<script>
+(function () {
+  'use strict';
+  var grid = document.getElementById('grid');
+
+  function save(blob, name) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+  }
+  function base(p) { return p.split('/').pop(); }
+
+  AssetLib.ASSETS.forEach(function (a) {
+    var c = a.make();
+    var box = document.createElement('div'); box.className = 'item';
+    var code = document.createElement('code'); code.textContent = a.path;
+    var dim = document.createElement('small'); dim.textContent = c.width + ' × ' + c.height + ' px';
+    var btn = document.createElement('button'); btn.type = 'button'; btn.className = 'alt'; btn.textContent = 'Download';
+    btn.addEventListener('click', function () { AssetLib.toBlob(a.make()).then(function (b) { save(b, base(a.path)); }); });
+    c.style.maxHeight = '220px';
+    box.append(c, code, dim, btn);
+    grid.appendChild(box);
+  });
+
+  document.getElementById('all').addEventListener('click', async function () {
+    for (var i = 0; i < AssetLib.ASSETS.length; i++) {
+      var a = AssetLib.ASSETS[i];
+      save(await AssetLib.toBlob(a.make()), base(a.path));
+      await new Promise(function (r) { setTimeout(r, 350); });
+    }
+  });
+  document.getElementById('ico').addEventListener('click', async function () { save(await AssetLib.icoBlob(), 'favicon.ico'); });
+  document.getElementById('zip').addEventListener('click', function () { location.href = './export-zip.html'; });
+})();
+</script>
+</body>
+</html>
